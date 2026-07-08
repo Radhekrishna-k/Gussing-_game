@@ -22,6 +22,8 @@ TURQUOISE = (64, 224, 208)  # Turquoise
 ORANGE = (255, 140, 0)  # Orange (spices)
 PURPLE = (186, 85, 211)  # Medium orchid
 DARK_BLUE = (25, 40, 100)
+GREEN = (34, 139, 34)  # Forest green
+BLACK = (0, 0, 0)
 
 # Clock for FPS
 clock = pygame.time.Clock()
@@ -38,11 +40,20 @@ JODHPURI_PLACES = [
 
 # Player class
 class Player(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, player_id=1):
         super().__init__()
+        self.player_id = player_id
         self.image = pygame.Surface((50, 50))
-        pygame.draw.rect(self.image, TURQUOISE, (0, 0, 50, 50))
+        
+        # Different colors for different players
+        player_colors = [TURQUOISE, ORANGE, PURPLE]
+        player_color = player_colors[player_id % len(player_colors)]
+        
+        pygame.draw.rect(self.image, player_color, (0, 0, 50, 50))
         pygame.draw.circle(self.image, GOLD, (25, 15), 8)  # Head
+        pygame.draw.circle(self.image, BLACK, (20, 13), 3)  # Left eye
+        pygame.draw.circle(self.image, BLACK, (30, 13), 3)  # Right eye
+        
         self.rect = self.image.get_rect()
         self.rect.centerx = SCREEN_WIDTH // 2
         self.rect.bottom = SCREEN_HEIGHT - 20
@@ -70,6 +81,64 @@ class Player(pygame.sprite.Sprite):
     def draw(self, surface):
         if self.is_protected:
             pygame.draw.circle(surface, GOLD, self.rect.center, 35, 3)
+        surface.blit(self.image, self.rect)
+
+# Coin class - Collectible currency
+class Coin(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        self.image = pygame.Surface((25, 25))
+        self.image.fill(GOLD)
+        pygame.draw.circle(self.image, ORANGE, (12, 12), 10)
+        pygame.draw.line(self.image, ORANGE, (12, 3), (12, 21), 2)
+        pygame.draw.line(self.image, ORANGE, (3, 12), (21, 12), 2)
+        
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        self.speed = 3
+        self.rotation = 0
+
+    def update(self):
+        self.rect.y += self.speed
+        self.rotation += 5
+        if self.rect.top > SCREEN_HEIGHT:
+            self.kill()
+
+    def draw(self, surface):
+        surface.blit(self.image, self.rect)
+
+# Police class - Enemy that chases and blocks
+class Police(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        self.image = pygame.Surface((55, 50))
+        self.image.fill(BLACK)  # Police body
+        # Draw police car/officer
+        pygame.draw.rect(self.image, RED, (10, 5, 35, 20))  # Red siren
+        pygame.draw.rect(self.image, WHITE, (5, 20, 45, 25))  # White body
+        pygame.draw.circle(self.image, DARK_BLUE, (15, 40), 8)  # Wheels
+        pygame.draw.circle(self.image, DARK_BLUE, (40, 40), 8)
+        
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        self.speed = 5
+        self.direction = random.choice([-1, 1])  # Move left or right
+        self.change_direction_timer = 0
+
+    def update(self):
+        self.rect.y += self.speed
+        self.rect.x += self.direction * 2  # Slight sideways movement
+        
+        # Bounce off edges
+        if self.rect.left <= 0 or self.rect.right >= SCREEN_WIDTH:
+            self.direction *= -1
+        
+        if self.rect.top > SCREEN_HEIGHT:
+            self.kill()
+
+    def draw(self, surface):
         surface.blit(self.image, self.rect)
 
 # Obstacle class - Jodhpuri obstacles (traffic, vendors, etc.)
@@ -199,14 +268,18 @@ class Landmark:
 
 # Game class
 class Game:
-    def __init__(self):
-        self.player = Player()
+    def __init__(self, num_players=1):
+        self.num_players = num_players
+        self.player = Player(player_id=0)  # Main player
         self.obstacles = pygame.sprite.Group()
         self.collectibles = pygame.sprite.Group()
+        self.coins = pygame.sprite.Group()
         self.powerups = pygame.sprite.Group()
+        self.police = pygame.sprite.Group()
         self.landmark = Landmark()
         
         self.score = 0
+        self.coins_collected = 0
         self.high_score = 0
         self.health = 3
         self.game_over = False
@@ -223,6 +296,8 @@ class Game:
         self.font_large = pygame.font.Font(None, 48)
         self.font_medium = pygame.font.Font(None, 36)
         self.font_small = pygame.font.Font(None, 24)
+        
+        self.police_spawn_timer = 0
 
     def spawn_obstacle(self):
         x = random.randint(0, SCREEN_WIDTH - 60)
@@ -232,16 +307,26 @@ class Game:
         x = random.randint(0, SCREEN_WIDTH - 35)
         self.collectibles.add(Collectible(x, -35))
 
+    def spawn_coin(self):
+        x = random.randint(0, SCREEN_WIDTH - 25)
+        self.coins.add(Coin(x, -25))
+
     def spawn_powerup(self):
         x = random.randint(0, SCREEN_WIDTH - 45)
         self.powerups.add(PowerUp(x, -45))
+
+    def spawn_police(self):
+        x = random.randint(0, SCREEN_WIDTH - 55)
+        self.police.add(Police(x, -50))
 
     def update(self):
         if not self.game_over:
             self.player.update()
             self.obstacle = self.obstacles.update()
             self.collectibles.update()
+            self.coins.update()
             self.powerups.update()
+            self.police.update()
             self.landmark.update()
 
             # Increase difficulty
@@ -258,9 +343,20 @@ class Game:
             if random.randint(1, 100) > 85:
                 self.spawn_collectible()
 
+            # Spawn coins (more frequent)
+            if random.randint(1, 100) > 80:
+                self.spawn_coin()
+
             # Spawn power-ups
             if random.randint(1, 100) > 96:
                 self.spawn_powerup()
+
+            # Spawn police (increases with difficulty)
+            self.police_spawn_timer += 1
+            police_spawn_rate = max(80, 150 - int(self.difficulty * 10))
+            if self.police_spawn_timer > police_spawn_rate and self.score > 100:
+                self.spawn_police()
+                self.police_spawn_timer = 0
 
             # Update power-up timers
             if self.has_shield:
@@ -289,6 +385,15 @@ class Game:
                     if distance > 0 and distance < 150:
                         collectible.rect.centerx += dx / distance * 5
                         collectible.rect.centery += dy / distance * 5
+                
+                # Magnet also pulls coins
+                for coin in self.coins:
+                    dx = self.player.rect.centerx - coin.rect.centerx
+                    dy = self.player.rect.centery - coin.rect.centery
+                    distance = (dx**2 + dy**2)**0.5
+                    if distance > 0 and distance < 150:
+                        coin.rect.centerx += dx / distance * 5
+                        coin.rect.centery += dy / distance * 5
 
             # Check collisions with obstacles
             hit_obstacles = pygame.sprite.spritecollide(self.player, self.obstacles, True)
@@ -305,6 +410,24 @@ class Game:
             # Check collisions with collectibles
             for collectible in pygame.sprite.spritecollide(self.player, self.collectibles, True):
                 self.score += collectible.points
+
+            # Check collisions with coins
+            for coin in pygame.sprite.spritecollide(self.player, self.coins, True):
+                self.coins_collected += 1
+                self.score += 5
+
+            # Check collisions with police
+            hit_police = pygame.sprite.spritecollide(self.player, self.police, True)
+            for officer in hit_police:
+                if self.has_shield:
+                    self.has_shield = False
+                    self.player.is_protected = False
+                    self.score += 50  # Bonus for escaping police with shield
+                else:
+                    self.health -= 1
+                    if self.health <= 0:
+                        self.game_over = True
+                        self.high_score = max(self.high_score, self.score)
 
             # Check collisions with power-ups
             for powerup in pygame.sprite.spritecollide(self.player, self.powerups, True):
@@ -345,8 +468,12 @@ class Game:
             obstacle.draw(surface)
         for collectible in self.collectibles:
             collectible.draw(surface)
+        for coin in self.coins:
+            coin.draw(surface)
         for powerup in self.powerups:
             powerup.draw(surface)
+        for officer in self.police:
+            officer.draw(surface)
 
         # Draw HUD
         score_text = self.font_medium.render(f"Score: {self.score}", True, GOLD)
@@ -358,6 +485,10 @@ class Game:
         # Health hearts
         health_text = self.font_small.render(f"❤️ {self.health}", True, RED)
         surface.blit(health_text, (10, 50))
+
+        # Coins counter
+        coins_text = self.font_small.render(f"💰 {self.coins_collected}", True, GOLD)
+        surface.blit(coins_text, (SCREEN_WIDTH - 150, 70))
 
         # Power-ups status
         powerup_status = ""
@@ -385,19 +516,21 @@ class Game:
 
             game_over_text = self.font_large.render("खेल खत्म!", True, RED)  # "Game Over" in Hindi
             final_score_text = self.font_medium.render(f"अंतिम स्कोर: {self.score}", True, GOLD)
+            coins_final_text = self.font_small.render(f"सिक्के: {self.coins_collected}", True, GOLD)
             high_score_text = self.font_medium.render(f"उच्चतम स्कोर: {self.high_score}", True, TURQUOISE)
             restart_text = self.font_small.render("R दबाएँ पुनः शुरू करने के लिए | Q छोड़ने के लिए", True, WHITE)
 
             surface.blit(game_over_text, (SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT // 2 - 100))
             surface.blit(final_score_text, (SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT // 2 - 20))
-            surface.blit(high_score_text, (SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT // 2 + 30))
+            surface.blit(coins_final_text, (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 + 10))
+            surface.blit(high_score_text, (SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT // 2 + 50))
             surface.blit(restart_text, (SCREEN_WIDTH // 2 - 280, SCREEN_HEIGHT // 2 + 100))
 
         pygame.display.flip()
 
 # Main game loop
 def main():
-    game = Game()
+    game = Game(num_players=1)
     running = True
 
     # Show welcome screen
@@ -410,7 +543,7 @@ def main():
                 running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r and game.game_over:
-                    game = Game()
+                    game = Game(num_players=1)
                     welcome_shown = False
                 if event.key == pygame.K_q and game.game_over:
                     running = False
@@ -421,11 +554,13 @@ def main():
             screen.fill(BLUE_CITY)
             title = pygame.font.Font(None, 72).render("जोधपुर रेलवे!", True, GOLD)
             subtitle = pygame.font.Font(None, 36).render("Jodhpuri Subway Surfers", True, TURQUOISE)
-            instructions = pygame.font.Font(None, 24).render("नीले शहर में सर्फ करें | Press SPACE to Start", True, WHITE)
+            instructions = pygame.font.Font(None, 20).render("नीले शहर में सर्फ करें | सिक्के इकट्ठा करो | पुलिस से बचो!", True, WHITE)
+            start_text = pygame.font.Font(None, 24).render("Press SPACE to Start", True, GOLD)
             
-            screen.blit(title, (SCREEN_WIDTH // 2 - 280, SCREEN_HEIGHT // 2 - 100))
-            screen.blit(subtitle, (SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT // 2 - 20))
-            screen.blit(instructions, (SCREEN_WIDTH // 2 - 250, SCREEN_HEIGHT // 2 + 60))
+            screen.blit(title, (SCREEN_WIDTH // 2 - 280, SCREEN_HEIGHT // 2 - 120))
+            screen.blit(subtitle, (SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT // 2 - 30))
+            screen.blit(instructions, (SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT // 2 + 30))
+            screen.blit(start_text, (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 + 100))
             
             pygame.display.flip()
         else:
