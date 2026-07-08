@@ -1,1 +1,441 @@
+import pygame
+import random
+import sys
 
+# Initialize Pygame
+pygame.init()
+
+# Screen dimensions
+SCREEN_WIDTH = 500
+SCREEN_HEIGHT = 700
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Jodhpuri Subway Surfers - Blue City Adventure")
+
+# Colors - Jodhpuri Theme
+BLUE_CITY = (30, 58, 138)  # Deep blue (Jodhpuri houses)
+LIGHT_BLUE = (70, 130, 180)  # Light blue buildings
+SKY_BLUE = (135, 206, 235)  # Sky blue
+WHITE = (255, 255, 255)
+RED = (220, 20, 60)  # Crimson
+GOLD = (255, 215, 0)  # Gold (jewelry)
+TURQUOISE = (64, 224, 208)  # Turquoise
+ORANGE = (255, 140, 0)  # Orange (spices)
+PURPLE = (186, 85, 211)  # Medium orchid
+DARK_BLUE = (25, 40, 100)
+
+# Clock for FPS
+clock = pygame.time.Clock()
+FPS = 60
+
+# Jodhpuri locations/landmarks
+JODHPURI_PLACES = [
+    {"name": "Mehrangarh Fort", "color": ORANGE},
+    {"name": "Clock Tower", "color": GOLD},
+    {"name": "Sardar Market", "color": TURQUOISE},
+    {"name": "Umaid Bhawan Palace", "color": PURPLE},
+    {"name": "Blue Houses", "color": LIGHT_BLUE}
+]
+
+# Player class
+class Player(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((50, 50))
+        pygame.draw.rect(self.image, TURQUOISE, (0, 0, 50, 50))
+        pygame.draw.circle(self.image, GOLD, (25, 15), 8)  # Head
+        self.rect = self.image.get_rect()
+        self.rect.centerx = SCREEN_WIDTH // 2
+        self.rect.bottom = SCREEN_HEIGHT - 20
+        self.speed = 6
+        self.is_protected = False
+        self.protection_time = 0
+
+    def update(self):
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT] and self.rect.left > 0:
+            self.rect.x -= self.speed
+        if keys[pygame.K_RIGHT] and self.rect.right < SCREEN_WIDTH:
+            self.rect.x += self.speed
+        if keys[pygame.K_UP] and self.rect.top > 100:
+            self.rect.y -= self.speed
+        if keys[pygame.K_DOWN] and self.rect.bottom < SCREEN_HEIGHT - 20:
+            self.rect.y += self.speed
+        
+        # Update protection status
+        if self.is_protected:
+            self.protection_time -= 1
+            if self.protection_time <= 0:
+                self.is_protected = False
+
+    def draw(self, surface):
+        if self.is_protected:
+            pygame.draw.circle(surface, GOLD, self.rect.center, 35, 3)
+        surface.blit(self.image, self.rect)
+
+# Obstacle class - Jodhpuri obstacles (traffic, vendors, etc.)
+class Obstacle(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        obstacle_type = random.choice(["auto", "vendor", "cart", "camel"])
+        self.type = obstacle_type
+        self.image = pygame.Surface((60, 40))
+        
+        if obstacle_type == "auto":
+            self.image.fill(RED)
+            pygame.draw.circle(self.image, DARK_BLUE, (10, 20), 5)
+            pygame.draw.circle(self.image, DARK_BLUE, (50, 20), 5)
+        elif obstacle_type == "vendor":
+            self.image.fill(ORANGE)
+            pygame.draw.rect(self.image, GOLD, (10, 5, 40, 15))
+        elif obstacle_type == "cart":
+            self.image.fill(LIGHT_BLUE)
+            pygame.draw.circle(self.image, DARK_BLUE, (15, 35), 8)
+            pygame.draw.circle(self.image, DARK_BLUE, (45, 35), 8)
+        else:  # camel
+            self.image.fill((210, 180, 140))
+            pygame.draw.circle(self.image, (180, 150, 100), (30, 10), 10)
+        
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        self.speed = 4 + random.randint(0, 2)
+
+    def update(self):
+        self.rect.y += self.speed
+        if self.rect.top > SCREEN_HEIGHT:
+            self.kill()
+
+    def draw(self, surface):
+        surface.blit(self.image, self.rect)
+
+# Collectible class - Spices, jewelry, sweets
+class Collectible(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        item_type = random.choice(["spice", "jewelry", "sweet", "lassi"])
+        self.type = item_type
+        self.image = pygame.Surface((35, 35))
+        
+        if item_type == "spice":
+            self.image.fill(ORANGE)
+            pygame.draw.circle(self.image, GOLD, (17, 17), 5)
+            self.points = 10
+        elif item_type == "jewelry":
+            self.image.fill(GOLD)
+            pygame.draw.circle(self.image, TURQUOISE, (17, 17), 8)
+            self.points = 25
+        elif item_type == "sweet":
+            self.image.fill((255, 192, 203))
+            pygame.draw.circle(self.image, ORANGE, (17, 17), 6)
+            self.points = 15
+        else:  # lassi
+            self.image.fill(TURQUOISE)
+            pygame.draw.rect(self.image, WHITE, (8, 5, 19, 25))
+            self.points = 20
+        
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        self.speed = 3
+
+    def update(self):
+        self.rect.y += self.speed
+        if self.rect.top > SCREEN_HEIGHT:
+            self.kill()
+
+    def draw(self, surface):
+        surface.blit(self.image, self.rect)
+
+# Power-up class - Special items (shield, speed boost, etc.)
+class PowerUp(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        power_type = random.choice(["shield", "boost", "magnet"])
+        self.type = power_type
+        self.image = pygame.Surface((45, 45))
+        
+        if power_type == "shield":
+            pygame.draw.rect(self.image, GOLD, (5, 5, 35, 35))
+            pygame.draw.rect(self.image, TURQUOISE, (10, 10, 25, 25))
+            self.duration = 300
+        elif power_type == "boost":
+            pygame.draw.polygon(self.image, PURPLE, [(22, 5), (40, 40), (4, 40)])
+            self.duration = 200
+        else:  # magnet
+            pygame.draw.circle(self.image, RED, (22, 22), 15)
+            pygame.draw.circle(self.image, LIGHT_BLUE, (15, 15), 5)
+            pygame.draw.circle(self.image, LIGHT_BLUE, (30, 30), 5)
+            self.duration = 250
+        
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        self.speed = 3
+
+    def update(self):
+        self.rect.y += self.speed
+        if self.rect.top > SCREEN_HEIGHT:
+            self.kill()
+
+    def draw(self, surface):
+        surface.blit(self.image, self.rect)
+
+# Landmark display
+class Landmark:
+    def __init__(self):
+        self.current = random.choice(JODHPURI_PLACES)
+        self.display_time = 0
+
+    def update(self):
+        self.display_time -= 1
+        if self.display_time <= 0:
+            self.current = random.choice(JODHPURI_PLACES)
+            self.display_time = 180
+
+    def draw(self, surface, font):
+        if self.display_time > 0:
+            landmark_text = font.render(f"📍 {self.current['name']}", True, self.current['color'])
+            surface.blit(landmark_text, (SCREEN_WIDTH // 2 - 120, 20))
+
+# Game class
+class Game:
+    def __init__(self):
+        self.player = Player()
+        self.obstacles = pygame.sprite.Group()
+        self.collectibles = pygame.sprite.Group()
+        self.powerups = pygame.sprite.Group()
+        self.landmark = Landmark()
+        
+        self.score = 0
+        self.high_score = 0
+        self.health = 3
+        self.game_over = False
+        self.spawn_timer = 0
+        self.difficulty = 1
+        
+        self.has_shield = False
+        self.has_boost = False
+        self.has_magnet = False
+        self.shield_time = 0
+        self.boost_time = 0
+        self.magnet_time = 0
+        
+        self.font_large = pygame.font.Font(None, 48)
+        self.font_medium = pygame.font.Font(None, 36)
+        self.font_small = pygame.font.Font(None, 24)
+
+    def spawn_obstacle(self):
+        x = random.randint(0, SCREEN_WIDTH - 60)
+        self.obstacles.add(Obstacle(x, -40))
+
+    def spawn_collectible(self):
+        x = random.randint(0, SCREEN_WIDTH - 35)
+        self.collectibles.add(Collectible(x, -35))
+
+    def spawn_powerup(self):
+        x = random.randint(0, SCREEN_WIDTH - 45)
+        self.powerups.add(PowerUp(x, -45))
+
+    def update(self):
+        if not self.game_over:
+            self.player.update()
+            self.obstacle = self.obstacles.update()
+            self.collectibles.update()
+            self.powerups.update()
+            self.landmark.update()
+
+            # Increase difficulty
+            self.difficulty = 1 + (self.score // 200) * 0.3
+
+            # Spawn obstacles
+            self.spawn_timer += 1
+            spawn_rate = max(25, 60 - int(self.difficulty * 8))
+            if self.spawn_timer > spawn_rate:
+                self.spawn_obstacle()
+                self.spawn_timer = 0
+
+            # Spawn collectibles
+            if random.randint(1, 100) > 85:
+                self.spawn_collectible()
+
+            # Spawn power-ups
+            if random.randint(1, 100) > 96:
+                self.spawn_powerup()
+
+            # Update power-up timers
+            if self.has_shield:
+                self.shield_time -= 1
+                if self.shield_time <= 0:
+                    self.has_shield = False
+                    self.player.is_protected = False
+
+            if self.has_boost:
+                self.boost_time -= 1
+                if self.boost_time <= 0:
+                    self.has_boost = False
+                    self.player.speed = 6
+
+            if self.has_magnet:
+                self.magnet_time -= 1
+                if self.magnet_time <= 0:
+                    self.has_magnet = False
+
+            # Magnet pulls collectibles to player
+            if self.has_magnet:
+                for collectible in self.collectibles:
+                    dx = self.player.rect.centerx - collectible.rect.centerx
+                    dy = self.player.rect.centery - collectible.rect.centery
+                    distance = (dx**2 + dy**2)**0.5
+                    if distance > 0 and distance < 150:
+                        collectible.rect.centerx += dx / distance * 5
+                        collectible.rect.centery += dy / distance * 5
+
+            # Check collisions with obstacles
+            hit_obstacles = pygame.sprite.spritecollide(self.player, self.obstacles, True)
+            for obstacle in hit_obstacles:
+                if self.has_shield:
+                    self.has_shield = False
+                    self.player.is_protected = False
+                else:
+                    self.health -= 1
+                    if self.health <= 0:
+                        self.game_over = True
+                        self.high_score = max(self.high_score, self.score)
+
+            # Check collisions with collectibles
+            for collectible in pygame.sprite.spritecollide(self.player, self.collectibles, True):
+                self.score += collectible.points
+
+            # Check collisions with power-ups
+            for powerup in pygame.sprite.spritecollide(self.player, self.powerups, True):
+                if powerup.type == "shield":
+                    self.has_shield = True
+                    self.shield_time = 300
+                    self.player.is_protected = True
+                elif powerup.type == "boost":
+                    self.has_boost = True
+                    self.boost_time = 200
+                    self.player.speed = 10
+                else:  # magnet
+                    self.has_magnet = True
+                    self.magnet_time = 250
+                    self.score += 30
+
+    def draw(self, surface):
+        # Draw gradient sky background
+        for y in range(SCREEN_HEIGHT):
+            ratio = y / SCREEN_HEIGHT
+            color = (
+                int(BLUE_CITY[0] + (SKY_BLUE[0] - BLUE_CITY[0]) * ratio),
+                int(BLUE_CITY[1] + (SKY_BLUE[1] - BLUE_CITY[1]) * ratio),
+                int(BLUE_CITY[2] + (SKY_BLUE[2] - BLUE_CITY[2]) * ratio)
+            )
+            pygame.draw.line(surface, color, (0, y), (SCREEN_WIDTH, y))
+
+        # Draw buildings
+        for i in range(0, SCREEN_WIDTH, 100):
+            pygame.draw.rect(surface, LIGHT_BLUE, (i, SCREEN_HEIGHT - 100, 90, 100))
+            pygame.draw.rect(surface, BLUE_CITY, (i + 10, SCREEN_HEIGHT - 90, 15, 20))
+            pygame.draw.rect(surface, BLUE_CITY, (i + 35, SCREEN_HEIGHT - 90, 15, 20))
+            pygame.draw.rect(surface, BLUE_CITY, (i + 60, SCREEN_HEIGHT - 90, 15, 20))
+
+        # Draw game objects
+        self.player.draw(surface)
+        for obstacle in self.obstacles:
+            obstacle.draw(surface)
+        for collectible in self.collectibles:
+            collectible.draw(surface)
+        for powerup in self.powerups:
+            powerup.draw(surface)
+
+        # Draw HUD
+        score_text = self.font_medium.render(f"Score: {self.score}", True, GOLD)
+        surface.blit(score_text, (10, 10))
+
+        level_text = self.font_small.render(f"Level: {int(self.difficulty)}", True, TURQUOISE)
+        surface.blit(level_text, (SCREEN_WIDTH - 200, 10))
+
+        # Health hearts
+        health_text = self.font_small.render(f"❤️ {self.health}", True, RED)
+        surface.blit(health_text, (10, 50))
+
+        # Power-ups status
+        powerup_status = ""
+        if self.has_shield:
+            powerup_status += "🛡️ "
+        if self.has_boost:
+            powerup_status += "⚡ "
+        if self.has_magnet:
+            powerup_status += "🧲 "
+        
+        if powerup_status:
+            status_text = self.font_small.render(powerup_status, True, GOLD)
+            surface.blit(status_text, (SCREEN_WIDTH - 200, 50))
+
+        # Draw landmark
+        self.landmark.draw(surface, self.font_small)
+
+        # Game over screen
+        if self.game_over:
+            # Semi-transparent overlay
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            overlay.set_alpha(200)
+            overlay.fill(DARK_BLUE)
+            surface.blit(overlay, (0, 0))
+
+            game_over_text = self.font_large.render("खेल खत्म!", True, RED)  # "Game Over" in Hindi
+            final_score_text = self.font_medium.render(f"अंतिम स्कोर: {self.score}", True, GOLD)
+            high_score_text = self.font_medium.render(f"उच्चतम स्कोर: {self.high_score}", True, TURQUOISE)
+            restart_text = self.font_small.render("R दबाएँ पुनः शुरू करने के लिए | Q छोड़ने के लिए", True, WHITE)
+
+            surface.blit(game_over_text, (SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT // 2 - 100))
+            surface.blit(final_score_text, (SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT // 2 - 20))
+            surface.blit(high_score_text, (SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT // 2 + 30))
+            surface.blit(restart_text, (SCREEN_WIDTH // 2 - 280, SCREEN_HEIGHT // 2 + 100))
+
+        pygame.display.flip()
+
+# Main game loop
+def main():
+    game = Game()
+    running = True
+
+    # Show welcome screen
+    welcome_shown = False
+    welcome_timer = 0
+
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r and game.game_over:
+                    game = Game()
+                    welcome_shown = False
+                if event.key == pygame.K_q and game.game_over:
+                    running = False
+                if event.key == pygame.K_SPACE and not welcome_shown:
+                    welcome_shown = True
+
+        if not welcome_shown:
+            screen.fill(BLUE_CITY)
+            title = pygame.font.Font(None, 72).render("जोधपुर रेलवे!", True, GOLD)
+            subtitle = pygame.font.Font(None, 36).render("Jodhpuri Subway Surfers", True, TURQUOISE)
+            instructions = pygame.font.Font(None, 24).render("नीले शहर में सर्फ करें | Press SPACE to Start", True, WHITE)
+            
+            screen.blit(title, (SCREEN_WIDTH // 2 - 280, SCREEN_HEIGHT // 2 - 100))
+            screen.blit(subtitle, (SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT // 2 - 20))
+            screen.blit(instructions, (SCREEN_WIDTH // 2 - 250, SCREEN_HEIGHT // 2 + 60))
+            
+            pygame.display.flip()
+        else:
+            game.update()
+            game.draw(screen)
+
+        clock.tick(FPS)
+
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
