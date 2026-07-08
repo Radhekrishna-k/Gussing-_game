@@ -1,9 +1,12 @@
 import pygame
 import random
 import sys
+from pygame import mixer
+import os
 
 # Initialize Pygame
 pygame.init()
+mixer.init()
 
 # Screen dimensions
 SCREEN_WIDTH = 500
@@ -37,6 +40,192 @@ JODHPURI_PLACES = [
     {"name": "Umaid Bhawan Palace", "color": PURPLE},
     {"name": "Blue Houses", "color": LIGHT_BLUE}
 ]
+
+# Audio Manager for Rajasthani themed music
+class AudioManager:
+    def __init__(self):
+        self.bg_music_playing = False
+        self.music_volume = 0.5
+        self.sound_effects_volume = 0.7
+        self.music_enabled = True
+        self.sound_effects_enabled = True
+        
+    def generate_rajasthani_rap_beat(self):
+        """
+        Generate a simple Rajasthani-themed beat using synthesized sounds.
+        This is a fallback if no audio file exists.
+        """
+        # Create a simple "dhol" drum pattern
+        frequency = 100  # Bass drum frequency
+        duration = 500  # milliseconds
+        sample_rate = 22050
+        frames = int(sample_rate * duration / 1000)
+        
+        # Generate a simple sine wave
+        import math
+        arr = []
+        for i in range(frames):
+            # Create a decaying beat pattern
+            amp = int(32767 * (1 - i / frames) * 0.3)
+            val = int(amp * math.sin(2 * math.pi * frequency * i / sample_rate))
+            arr.append(val & 0xffff)
+        
+        return arr
+    
+    def play_background_music(self):
+        """Play background Rajasthani rap music"""
+        if not self.music_enabled:
+            return
+            
+        try:
+            # Try to load a music file if it exists
+            music_files = ["rajasthani_rap.mp3", "background.mp3", "rajasthani.mp3"]
+            for music_file in music_files:
+                if os.path.exists(music_file):
+                    mixer.music.load(music_file)
+                    mixer.music.set_volume(self.music_volume)
+                    mixer.music.play(-1)  # Loop infinitely
+                    self.bg_music_playing = True
+                    return
+            
+            # If no file found, create a simple beep pattern
+            print("No music file found. Using synthesized background audio.")
+            self.create_synthetic_music()
+            
+        except Exception as e:
+            print(f"Audio not available: {e}")
+    
+    def create_synthetic_music(self):
+        """Create a simple synthesized music pattern if no file is available"""
+        # This creates a basic drum pattern sound
+        sample_rate = 22050
+        duration = 2  # seconds
+        
+        # Create a simple pattern
+        try:
+            import math
+            frames = sample_rate * duration
+            arr = []
+            
+            for i in range(frames):
+                # Create a simple pattern with different frequencies
+                t = i / sample_rate
+                beat_time = int(t) % 4
+                
+                # Drum pattern
+                if 0 <= beat_time < 1:
+                    freq = 150
+                elif 1 <= beat_time < 2:
+                    freq = 0
+                elif 2 <= beat_time < 3:
+                    freq = 150
+                else:
+                    freq = 100
+                
+                amp = 5000
+                if freq > 0:
+                    val = int(amp * math.sin(2 * math.pi * freq * i / sample_rate))
+                else:
+                    val = 0
+                    
+                arr.append(val & 0xffff)
+            
+            sound = pygame.sndarray.make_sound(arr)
+            sound.set_volume(self.music_volume)
+            sound.play(-1)
+            self.bg_music_playing = True
+        except:
+            pass
+    
+    def stop_music(self):
+        """Stop background music"""
+        try:
+            mixer.music.stop()
+            self.bg_music_playing = False
+        except:
+            pass
+    
+    def toggle_music(self):
+        """Toggle music on/off"""
+        self.music_enabled = not self.music_enabled
+        if self.music_enabled:
+            self.play_background_music()
+        else:
+            self.stop_music()
+    
+    def play_coin_sound(self):
+        """Play coin collection sound"""
+        if not self.sound_effects_enabled:
+            return
+        try:
+            # Simple beep for coin collection
+            sample_rate = 22050
+            duration = 100  # milliseconds
+            frames = int(sample_rate * duration / 1000)
+            
+            import math
+            arr = []
+            for i in range(frames):
+                freq = 800 + (i / frames) * 200  # Ascending tone
+                amp = int(32767 * (1 - i / frames) * 0.3)
+                val = int(amp * math.sin(2 * math.pi * freq * i / sample_rate))
+                arr.append(val & 0xffff)
+            
+            sound = pygame.sndarray.make_sound(arr)
+            sound.set_volume(self.sound_effects_volume)
+            sound.play()
+        except:
+            pass
+    
+    def play_hit_sound(self):
+        """Play collision/hit sound"""
+        if not self.sound_effects_enabled:
+            return
+        try:
+            sample_rate = 22050
+            duration = 150
+            frames = int(sample_rate * duration / 1000)
+            
+            import math
+            arr = []
+            for i in range(frames):
+                freq = 300 - (i / frames) * 100  # Descending tone
+                amp = int(32767 * (1 - i / frames) * 0.4)
+                val = int(amp * math.sin(2 * math.pi * freq * i / sample_rate))
+                arr.append(val & 0xffff)
+            
+            sound = pygame.sndarray.make_sound(arr)
+            sound.set_volume(self.sound_effects_volume)
+            sound.play()
+        except:
+            pass
+    
+    def play_powerup_sound(self):
+        """Play power-up collection sound"""
+        if not self.sound_effects_enabled:
+            return
+        try:
+            sample_rate = 22050
+            duration = 200
+            frames = int(sample_rate * duration / 1000)
+            
+            import math
+            arr = []
+            for i in range(frames):
+                t = i / sample_rate
+                freq = 600 + 200 * (1 + math.sin(2 * math.pi * 4 * t)) / 2
+                amp = int(32767 * (1 - i / frames) * 0.3)
+                val = int(amp * math.sin(2 * math.pi * freq * i / sample_rate))
+                arr.append(val & 0xffff)
+            
+            sound = pygame.sndarray.make_sound(arr)
+            sound.set_volume(self.sound_effects_volume)
+            sound.play()
+        except:
+            pass
+
+# Global audio manager
+audio_manager = AudioManager()
 
 # Player class
 class Player(pygame.sprite.Sprite):
@@ -398,6 +587,7 @@ class Game:
             # Check collisions with obstacles
             hit_obstacles = pygame.sprite.spritecollide(self.player, self.obstacles, True)
             for obstacle in hit_obstacles:
+                audio_manager.play_hit_sound()
                 if self.has_shield:
                     self.has_shield = False
                     self.player.is_protected = False
@@ -409,16 +599,19 @@ class Game:
 
             # Check collisions with collectibles
             for collectible in pygame.sprite.spritecollide(self.player, self.collectibles, True):
+                audio_manager.play_coin_sound()
                 self.score += collectible.points
 
             # Check collisions with coins
             for coin in pygame.sprite.spritecollide(self.player, self.coins, True):
+                audio_manager.play_coin_sound()
                 self.coins_collected += 1
                 self.score += 5
 
             # Check collisions with police
             hit_police = pygame.sprite.spritecollide(self.player, self.police, True)
             for officer in hit_police:
+                audio_manager.play_hit_sound()
                 if self.has_shield:
                     self.has_shield = False
                     self.player.is_protected = False
@@ -431,6 +624,7 @@ class Game:
 
             # Check collisions with power-ups
             for powerup in pygame.sprite.spritecollide(self.player, self.powerups, True):
+                audio_manager.play_powerup_sound()
                 if powerup.type == "shield":
                     self.has_shield = True
                     self.shield_time = 300
@@ -505,6 +699,11 @@ class Game:
 
         # Draw landmark
         self.landmark.draw(surface, self.font_small)
+        
+        # Music indicator
+        music_icon = "🔊" if audio_manager.music_enabled else "🔇"
+        music_text = self.font_small.render(f"{music_icon} M:Toggle", True, TURQUOISE)
+        surface.blit(music_text, (10, SCREEN_HEIGHT - 30))
 
         # Game over screen
         if self.game_over:
@@ -530,6 +729,9 @@ class Game:
 
 # Main game loop
 def main():
+    # Start background music
+    audio_manager.play_background_music()
+    
     game = Game(num_players=1)
     running = True
 
@@ -542,6 +744,8 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_m:
+                    audio_manager.toggle_music()
                 if event.key == pygame.K_r and game.game_over:
                     game = Game(num_players=1)
                     welcome_shown = False
@@ -554,12 +758,12 @@ def main():
             screen.fill(BLUE_CITY)
             title = pygame.font.Font(None, 72).render("जोधपुर रेलवे!", True, GOLD)
             subtitle = pygame.font.Font(None, 36).render("Jodhpuri Subway Surfers", True, TURQUOISE)
-            instructions = pygame.font.Font(None, 20).render("नीले शहर में सर्फ करें | सिक्के इकट्ठा करो | पुलिस से बचो!", True, WHITE)
+            instructions = pygame.font.Font(None, 18).render("सिक्के इकट्ठा करो | पुलिस से बचो | M = संगीत टॉगल करें", True, WHITE)
             start_text = pygame.font.Font(None, 24).render("Press SPACE to Start", True, GOLD)
             
             screen.blit(title, (SCREEN_WIDTH // 2 - 280, SCREEN_HEIGHT // 2 - 120))
             screen.blit(subtitle, (SCREEN_WIDTH // 2 - 200, SCREEN_HEIGHT // 2 - 30))
-            screen.blit(instructions, (SCREEN_WIDTH // 2 - 220, SCREEN_HEIGHT // 2 + 30))
+            screen.blit(instructions, (SCREEN_WIDTH // 2 - 210, SCREEN_HEIGHT // 2 + 30))
             screen.blit(start_text, (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 + 100))
             
             pygame.display.flip()
@@ -569,6 +773,7 @@ def main():
 
         clock.tick(FPS)
 
+    audio_manager.stop_music()
     pygame.quit()
     sys.exit()
 
